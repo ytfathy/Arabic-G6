@@ -72,10 +72,18 @@ function norm(s,strict){ s=String(s||"").replace(TASHKEEL,"").replace(/[«»"'�
  s=s.replace(/ى/g,"ي");
  if(!strict){ s=s.replace(/[أإآٱ]/g,"ا").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/ء/g,""); }
  return s.replace(/\s+/g," ").trim(); }
+// Keyword grading: a keyword counts if it appears anywhere, with or without «ال»/prefixes, in any word order, or with one typo (words of 5+ letters).
+// Strict items (spelling/grammar questions: it.st) keep exact keyword matching.
+const lev1=(a,b)=>{if(Math.abs(a.length-b.length)>1)return false;let i=0,j=0,e=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++e>1)return false;if(a.length>b.length)i++;else if(b.length>a.length)j++;else{i++;j++;}}return e+(a.length-i)+(b.length-j)<=1;};
+const bare=w=>w.length>4?w.replace(/^(وال|بال|فال|كال|لل|ال)/,""):w;
+const wordHit=(ws,k)=>k.length<3?ws.includes(k):ws.some(w=>{const kb=bare(k);return w.includes(k)||(kb.length>=3&&w.includes(kb))||(kb.length>=5&&lev1(bare(w),kb));});
 function kwMatch(ans,kw,strict,no,min){ const a=" "+norm(ans,strict)+" "; if(!a.trim())return false;
- if(min&&a.trim().split(" ").length<min)return false;
- if(no&&no.some(n=>n==="ال"?a.split(" ").some(w=>w.startsWith("ال")):a.includes(norm(n,strict))))return false;
- return kw.every(g=>g.some(alt=>alt==="*"?a.trim().length>0:a.includes(norm(alt,strict)))); }
+ const ws=a.trim().split(" ");
+ if(min&&ws.length<min)return false;
+ if(no&&no.some(n=>n==="ال"?ws.some(w=>w.startsWith("ال")):a.includes(norm(n,strict))))return false;
+ const hit=alt=>{if(alt==="*")return true;const n=norm(alt,strict);if(a.includes(n))return true;if(strict)return false;const ks=n.split(" ").filter(Boolean);return ks.length>0&&ks.every(k=>wordHit(ws,k));};
+ const need=strict?kw.length:Math.max(1,Math.ceil(kw.length*2/3)); // shortcut: 3+ keyword groups accept 2 of 3; raise to kw.length if too lenient
+ return kw.filter(g=>g.some(hit)).length>=need; }
 const wordsOf=s=>norm(s,false).split(" ").filter(Boolean);
 function grade(it,v){
  switch(it.t){
@@ -173,9 +181,9 @@ let PREV_SESSION=null;
 function route(){ if(ROUTING)return; ROUTING=true; if(SESSION&&/^#study-/.test(location.hash))PREV_SESSION=SESSION; try{ const ae=document.activeElement; if(ae&&ae!==document.body&&ae.blur)ae.blur(); routeInner(); } finally { ROUTING=false; } }
 function routeInner(){ const h=(location.hash||"#home").slice(1); if(h!=="run"&&SESSION){if(SESSION.submitted&&h!=="home"&&window.malek)malek.goodbye();endSessionSilently();}
  const [r,arg]=(()=>{const m=h.match(/^([a-z]+)-?([\w-]*)$/i);return m?[m[1],m[2]]:["home",""]})();
- const navCur={study:"skills",home:"home",weeks:"weeks",week:"weeks",skills:"skills",skill:"skills",lesson:"skills",exams:"exams",progress:"progress",key:"key",run:SESSION?SESSION.nav:"home"}[r]||"home";
+ const navCur={study:"skills",notes:"skills",home:"home",weeks:"weeks",week:"weeks",skills:"skills",skill:"skills",lesson:"skills",exams:"exams",progress:"progress",key:"key",run:SESSION?SESSION.nav:"home"}[r]||"home";
  drawNav(navCur); const app=$("#app"); window.scrollTo(0,0);
- const V={study:()=>vStudy(arg),home:vHome,weeks:vWeeks,week:()=>vWeek(arg),skills:vSkills,skill:()=>vSkill(+arg),lesson:()=>vLesson(+arg),exams:vExams,progress:vProgress,key:vKey,run:vRun}[r]||vHome;
+ const V={study:()=>vStudy(arg),notes:()=>vNotes(arg),home:vHome,weeks:vWeeks,week:()=>vWeek(arg),skills:vSkills,skill:()=>vSkill(+arg),lesson:()=>vLesson(+arg),exams:vExams,progress:vProgress,key:vKey,run:vRun}[r]||vHome;
  if(r==="run"&&!SESSION){setTimeout(()=>{location.hash="#home";});return;}
  app.innerHTML=`<div class="view">${V()}</div>`; bindView(r,arg); }
 window.addEventListener("hashchange",route);
@@ -229,7 +237,7 @@ function vLesson(i){ const L=LESSONS[i]; if(!L)return vSkills(); const s=SK[L.se
  return `<div class="crumbs"><a href="#skills">المهارات</a> / <a href="#skill-${s.i}">${s.k}</a> / ${esc(L.lesson)}</div>
  <h1>${esc(L.lesson)}</h1><p class="muted">${[...L.weeks].map(w=>WEEK_LABEL[w]).join("، ")} · ${AR(L.blocks.length)} نشاط/سؤال · ${AR(L.nScore)} بندًا يُصحح</p>
  <div class="kpis" style="margin:14px 0"><div class="kpi"><b>${AR(pct(st.att,st.total))}٪</b><span>الإنجاز</span></div><div class="kpi"><b>${AR(st.ok)}</b><span>صحيحة</span></div><div class="kpi"><b>${AR(st.bad)}</b><span>خاطئة</span></div><div class="kpi"><b>${st.acc==null?"—":AR(Math.round(st.acc*100))+"٪"}</b><span>الدقة</span></div></div>
- <div class="row">${studyBtn(L.lesson,false,true)}<button class="btn" data-start-lesson="${i}" data-mode="practice">تدريب</button><button class="btn soft" data-start-lesson="${i}" data-mode="learn">تعلّم مع الإجابات</button><button class="btn ghost" data-start-lesson="${i}" data-mode="test">اختبار الدرس</button></div>
+ <div class="row">${studyBtn(L.lesson,false,true)}${notesBtn(L.lesson)}<button class="btn" data-start-lesson="${i}" data-mode="practice">تدريب</button><button class="btn soft" data-start-lesson="${i}" data-mode="learn">تعلّم مع الإجابات</button><button class="btn ghost" data-start-lesson="${i}" data-mode="test">اختبار الدرس</button></div>
  <h3 style="margin-top:22px">محتوى الدرس</h3><div class="lesson-list">${L.blocks.map(b=>`<div class="lesson"><span class="lt"><b>${esc(b.title)}</b><span>${WEEK_LABEL[b.w]} · ${PERIOD_NAME[b.p]}${b.grp?" · المجموعة ("+b.grp+")":""} · ${KIND_LABEL[b.kind]} · ص ${AR(b.page)}</span></span></div>`).join("")}</div>`;}
 
 /* ---------- session ---------- */
@@ -253,7 +261,7 @@ function vRun(){ const X=SESSION; const n=X.order.length;
    qn++; inner+=itemHTML(b,i,it,qn,n); });
   return pre+`<article class="block" style="--c:${sk.c}" id="blk-${b.id}"><div class="block-h"><span class="tag"></span><div style="flex:1"><h3>${esc(b.title)}</h3><div class="meta"><span class="chip c" style="--c:${sk.c}">${b.sec}</span><span class="chip">${esc(b.lesson)}</span><span class="chip">${WEEK_LABEL[b.w]}${b.p?" · "+PERIOD_NAME[b.p]:""}${b.grp?" · مجموعة "+b.grp:""}</span><span class="chip">ص ${AR(b.page)}</span>${studyBtn(b.lesson,true)}</div></div></div>${b.note?`<div class="note">${esc(b.note)}</div>`:""}${b.source?`<div class="note" style="background:#EEF2FC;color:var(--navy2)">${esc(b.source)}</div>`:""}${listenHTML(b)}${passageHTML(b)}<div class="items">${inner}</div></article>`;}).join("");
  const modes=X.exam?"":`<div class="seg" role="tablist" aria-label="وضع الحل">${[["practice","تدريب"],["learn","تعلّم"],["test","اختبار"]].map(([m,l])=>`<button role="tab" aria-selected="${X.mode===m}" class="${X.mode===m?"on":""}" data-mode-switch="${m}">${l}</button>`).join("")}</div>`;
- return `<div class="sess-head"><div class="row" style="justify-content:space-between"><h2>${esc(X.title)}</h2>${modes}</div>
+ return `<div class="sess-head"><div class="row" style="justify-content:space-between"><h2>${esc(X.title)}</h2><div class="row">${modes}<button class="btn soft sm no-print" type="button" onclick="print()">🖨️ طباعة</button></div></div>
   <div class="sess-meta"><span id="sessCount"></span><div class="bar navy"><i id="sessBar" style="width:0"></i></div>${X.duration?`<span class="timer" id="timer"></span>`:""}<span class="chip" id="modeChip"></span></div></div>
   ${X.mode==="test"&&!X.submitted?`<div class="alert">وضع الاختبار: لن تظهر الإجابات حتى تضغط «تسليم» في نهاية الصفحة.</div>`:""}
   ${X.mode==="learn"?`<div class="alert" style="background:#EEF2FC;color:var(--navy2)">وضع التعلّم: تظهر الإجابة الصحيحة والشرح تحت كل سؤال.</div>`:""}
@@ -565,9 +573,36 @@ function vStudy(id){const R=REV[id];if(!R)return `<div class="empty">لا توج
    <span class="pl-stat" id="plStat"></span></div>`}</header>
   <div class="rgrid" id="sheet">${pairSecs(R.sections.map(secHTML))}</div>
   <div class="rev-end"><div><h3 style="margin:0">جاهز؟ ابدأ حل التقييم</h3><p class="muted" style="margin:4px 0 0">${AR(n)} سؤالًا من كتاب التقييمات لهذا الدرس.</p></div>
-   <div class="row">${PREV_SESSION?`<button class="btn soft" id="backSess">العودة إلى ما كنت تحله</button>`:""}${Ls.length?`<button class="btn gold" id="startRev">ابدأ حل التقييم ←</button>`:""}</div></div>
+   <div class="row">${notesBtn(R.lessons[0],"soft")}${PREV_SESSION?`<button class="btn soft" id="backSess">العودة إلى ما كنت تحله</button>`:""}${Ls.length?`<button class="btn gold" id="startRev">ابدأ حل التقييم ←</button>`:""}</div></div>
   <div id="adminBox"></div>
  </div>`;}
+/* ---------- handwritten summary (sketchnote) built from the same «ذاكر لي» card ---------- */
+const notesBtn=(lesson,cls)=>{const id=revId(lesson);return id&&!REV[id].sections.every(x=>x.type==="flag")?`<a class="btn ${cls||"soft"}" href="#notes-${id}">✍️ ملخص بخط اليد</a>`:"";};
+const brief=t=>{t=String(t);const c=t.split(/[.؛]\s/)[0];return c.length>130?c.slice(0,c.lastIndexOf(" ",125))+" …":c;};
+function noteHTML(x,i){const h=x.h?`<h3>${esc(x.h)}</h3>`:"";let b="";
+ switch(x.type){
+  case"idea":if(i<0)return `<div class="nb-idea">💭 ${hl(x.text)}</div>`;b=`<p>💭 ${hl(brief(x.text))}</p>`;break;
+  case"points":case"objectives":b=`<ul class="nb-ul">${x.items.slice(0,6).map(t=>`<li>${hl(brief(t))}</li>`).join("")}</ul>`;break;
+  case"vocab":b=`<div class="nb-stickies">${x.items.slice(0,8).map(v=>`<span class="nb-sticky"><b>${esc(v.w)}</b>${esc(brief(v.m))}</span>`).join("")}</div>`;break;
+  case"rule":b=x.items.map(r=>`<p class="nb-rule"><b>${esc(r.k)}</b> ← ${hl(brief(r.v))}</p>`).join("");break;
+  case"cases":b=`<ol class="nb-ol">${x.items.map(c=>`<li>${hl(brief(c.t))}<em> مثل: ${esc(c.ex)}</em></li>`).join("")}</ol>`;break;
+  case"examples":b=`<ul class="nb-ul">${x.rows.slice(0,4).map(r=>`<li>${r.map(hl).join(" ← ")}</li>`).join("")}</ul>`;break;
+  case"steps":b=`<div class="nb-flow">${x.items.map(s=>`<span>${esc(s.t)}</span>`).join("<i>⬅</i>")}</div>`;break;
+  case"stairs":b=`<div class="nb-flow">${x.items.map(s=>`<span>${esc(s)}</span>`).join("<i>⬅</i>")}</div>${x.foot?`<p>${hl(brief(x.foot))}</p>`:""}`;break;
+  case"compare":b=`<div class="nb-cmp"><span><b>${esc(x.a.t)}</b>${esc(x.a.d)}</span><i>≠</i><span><b>${esc(x.b.t)}</b>${esc(x.b.d)}</span></div>`;break;
+  case"beauty":b=`<ul class="nb-ul">${x.items.slice(0,4).map(t=>`<li>${esc(t.e)}</li>`).join("")}</ul>`;break;
+  case"poem":b=`<div class="nb-poem">${x.lines.slice(0,2).map(l=>`<span>${esc(l[0])}</span><span>${esc(l[1])}</span>`).join("")}</div>`;break;
+  case"note":b=`<p class="nb-warn">⚠ ${hl(brief(x.text))}</p>`;break;
+  case"bio":b=`<p>${hl(brief(x.text))}</p>`;break;
+  default:return"";}
+ return `<section class="nb-card" style="--rot:${[-1.2,.9,-.6,1.3][i%4]}deg">${h}${b}</section>`;}
+function vNotes(id){const R=REV[id];if(!R||R.sections.every(x=>x.type==="flag"))return `<div class="empty">لا يوجد ملخص لهذا الدرس بعد. <a href="#skills">عودة</a></div>`;
+ const idea=R.sections.find(x=>x.type==="idea");
+ return `<div class="crumbs no-print"><a href="#skills">التدريب حسب المهارة</a> / <a href="#study-${id}">ذاكر لي</a> / ملخص بخط اليد</div>
+ <div class="row no-print" style="margin-bottom:12px"><button class="btn gold sm" type="button" onclick="print()">🖨️ طباعة الملخص</button><a class="btn soft sm" href="#study-${id}">📘 البطاقة الكاملة</a></div>
+ <article class="notebook"><header class="nb-head"><span class="nb-ico" aria-hidden="true">${R.icon||"📘"}</span><h1><mark>${esc(R.title)}</mark></h1><small>${esc(R.kind)} · ${esc(R.src)}</small></header>
+ ${idea?noteHTML(idea,-1):""}<div class="nb-grid">${R.sections.filter(x=>x!==idea).map(noteHTML).join("")}</div>
+ <footer class="nb-foot">✍️ ملخصي · اللغة العربية · الصف السادس</footer></article>`;}
 function bindStudy(id){const R=REV[id];if(!R)return;
  const st=$("#startRev");if(st)st.onclick=()=>{const Ls=LESSONS.filter(L=>R.lessons.includes(L.lesson));const ord=Object.fromEntries(BANK.map((b,i)=>[b.id,i]));const bs=Ls.flatMap(L=>L.blocks).sort((a,b)=>ord[a.id]-ord[b.id]);PREV_SESSION=null;startSession({title:"تقييم: "+R.title,units:unitsFromBlocks(bs),mode:"practice",nav:"skills",back:"#study-"+id});};
  const bk=$("#backSess");if(bk)bk.onclick=()=>{const X=PREV_SESSION;PREV_SESSION=null;startSession(Object.assign({},X,{local:X.local}));};

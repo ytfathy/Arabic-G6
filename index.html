@@ -6,7 +6,7 @@
 <title>اللغة العربية – الصف السادس | International Education Egypt</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Aref+Ruqaa:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
  --paper:#FBF6EC;--paper2:#F4EBD8;--card:#FFFDF8;--ink:#14213D;--ink2:#4A5272;--muted:#7B7F92;
@@ -366,6 +366,46 @@ mark{background:linear-gradient(transparent 55%,var(--gold2) 55%);color:inherit;
 .flag-s{background:var(--warnbg);border-top-color:var(--warn)}
 .rev-end{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:18px;padding:18px 20px;border-radius:18px;background:var(--ink);color:#fff}
 .rev-end .muted{color:#CBD5E1}
+/* ===== handwritten summary (sketchnote) ===== */
+.notebook{--pen:#1F3A93;--red:#C0392B;--hl:#FFE066;font-family:"Aref Ruqaa",var(--f-text);color:var(--pen);font-size:21px;line-height:1.9;background:#FFFEF7;
+ background-image:linear-gradient(90deg,transparent 0 calc(100% - 46px),#F3B6B6 calc(100% - 46px) calc(100% - 44px),transparent 0),repeating-linear-gradient(#FFFEF7 0 37px,#CFE0F5 37px 38px);
+ border-radius:6px;padding:28px 64px 28px 24px;box-shadow:var(--shadow);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.notebook mark{background:linear-gradient(transparent 45%,var(--hl) 45% 90%,transparent 90%);color:inherit;padding:0 2px}
+.nb-head{text-align:center;margin-bottom:10px}
+.nb-head h1{font-family:"Aref Ruqaa",var(--f-text);font-size:clamp(30px,5vw,44px);margin:0;color:var(--red);line-height:1.5}
+.nb-head small{display:block;color:var(--ink2);font-size:16px}
+.nb-ico{font-size:40px}
+.nb-idea{margin:8px auto 22px;max-width:720px;text-align:center;font-size:24px;font-weight:700;padding:18px 26px;border:2.5px solid var(--pen);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;background:#fff}
+.nb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:22px}
+.nb-card{padding:14px 18px;border:2px solid var(--pen);border-radius:15px 255px 15px 225px/225px 15px 255px 15px;background:rgba(255,255,255,.75);transform:rotate(var(--rot));break-inside:avoid}
+.nb-card h3{font-family:"Aref Ruqaa",var(--f-text);margin:0 0 6px;color:var(--red);font-size:24px;text-decoration:underline wavy var(--red) 1.5px;text-underline-offset:8px}
+.nb-card p{margin:4px 0}
+.nb-ul,.nb-ol{margin:0;padding-right:22px}
+.nb-ul{list-style:"✎ "}
+.nb-ol em{display:block;color:var(--ok);font-style:normal;font-size:18px}
+.nb-rule b,.nb-cmp b{color:var(--red)}
+.nb-stickies{display:flex;flex-wrap:wrap;gap:10px}
+.nb-sticky{background:var(--hl);padding:6px 12px;font-size:18px;line-height:1.6;box-shadow:2px 3px 0 rgba(0,0,0,.12);max-width:100%}
+.nb-sticky:nth-child(even){background:#C9F0D3;transform:rotate(1.5deg)}
+.nb-sticky:nth-child(odd){transform:rotate(-1.5deg)}
+.nb-sticky b{display:block;color:var(--red)}
+.nb-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.nb-flow span{border:2px solid var(--pen);border-radius:999px;padding:0 12px}
+.nb-flow i{font-style:normal;color:var(--red)}
+.nb-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;text-align:center}
+.nb-cmp span{display:flex;flex-direction:column}
+.nb-cmp i{font-style:normal;font-size:30px;color:var(--red)}
+.nb-poem{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;text-align:center}
+.nb-warn{color:var(--red)}
+.nb-foot{text-align:center;margin-top:24px;color:var(--ink2);font-size:16px}
+@media (max-width:720px){.notebook{padding:20px 52px 20px 14px;font-size:19px}.nb-card{transform:none}}
+@media print{
+ .top,nav.main,.foot,.no-print,.crumbs,.sess-foot,.seg,.study-btn,.alert,.toast,.confetti,.modal-bg,body>[class*="iee-m-"]{display:none!important}
+ body{background:#fff}
+ .sess-head{position:static;border:0}
+ .block,.nb-card{break-inside:avoid}
+ .notebook{box-shadow:none;padding:12px 40px 12px 12px}
+}
 </style>
 </head>
 <body>
