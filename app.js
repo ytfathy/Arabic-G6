@@ -188,7 +188,7 @@ function routeInner(){ const h=(location.hash||"#home").slice(1); if(h!=="run"&&
  app.innerHTML=`<div class="view">${V()}</div>`; bindView(r,arg); }
 window.addEventListener("hashchange",route);
 window.addEventListener("resize",()=>{const on=$("#nav a.on");drawNav(on?on.getAttribute("href").slice(1):"home");});
-function endSessionSilently(){clearInterval(TIMER);TIMER=null;SESSION=null;}
+function endSessionSilently(){examSave();clearInterval(TIMER);TIMER=null;SESSION=null;}
 
 /* ---------- views ---------- */
 function vHome(){ const all=stats(ITEMS); const lastW=AVAILABLE_WEEKS.find(w=>{const s=stats(weekItems(w));return s.att<s.total})||AVAILABLE_WEEKS[0];
@@ -246,7 +246,9 @@ function startSession(o){ SESSION=Object.assign({mode:"practice",exam:false,loca
  SESSION.order=[];SESSION.units.forEach(u=>u.idx.forEach(i=>SESSION.order.push(u.b+"#"+i)));
  if(location.hash==="#run")route();else location.hash="#run"; }
 const getA=key=>SESSION&&SESSION.exam?SESSION.local[key]:S.ans[key];
-function setA(key,obj){ if(SESSION&&SESSION.exam){SESSION.local[key]=obj;} else {S.ans[key]=obj;save();} }
+// Unsubmitted exam answers and time used are kept in its «امتحاناتي» record so the student can continue later.
+function examSave(){const X=SESSION;if(!X||!X.exam||!X.examId||X.submitted)return;const ex=S.exams.find(e=>e.id===X.examId);if(!ex||ex.result)return;ex.answers=X.local;ex.used=Date.now()-X.started;save();}
+function setA(key,obj){ if(SESSION&&SESSION.exam){SESSION.local[key]=obj;examSave();} else {S.ans[key]=obj;save();} }
 
 function vRun(){ const X=SESSION; const n=X.order.length;
  let lastHead="",lastGrp="",lastKind="";let qn=0;
@@ -399,8 +401,9 @@ function pickUnits(units,n,dist,random){const byL={};units.forEach(u=>{(byL[u.lk
  if(!random){const ord=Object.fromEntries(BANK.map((b,i)=>[b.id,i]));out.sort((a,b)=>ord[a.b]-ord[b.b]||a.idx[0]-b.idx[0]);} else if(random)return shuffle(out);
  return out;}
 function newExamRecord(cfg,units){const ex={id:"e"+Date.now().toString(36),title:cfg.title,date:Date.now(),cfg:{...cfg,sel:[...cfg.sel],types:cfg.types?[...cfg.types]:null},units:units.map(u=>({b:u.b,idx:u.idx}))};S.exams.unshift(ex);S.exams=S.exams.slice(0,20);save();return ex;}
-function launchExam(cfg,units){const ex=newExamRecord(cfg,units);const mode={practice:"practice",formal:"test",revision:"learn"}[cfg.mode];
- startSession({title:cfg.title,units:ex.units,mode,exam:true,examId:ex.id,cfg,duration:cfg.duration||0,showAns:cfg.showAns,nav:"exams",back:"#exams"});}
+function launchExam(cfg,units){openExam(newExamRecord(cfg,units),cfg);}
+function openExam(ex,cfg){const mode={practice:"practice",formal:"test",revision:"learn"}[cfg.mode];
+ startSession({title:cfg.title,units:ex.units,mode,exam:true,examId:ex.id,cfg,duration:cfg.duration||0,showAns:cfg.showAns,nav:"exams",back:"#exams",local:Object.assign({},ex.answers||{}),started:Date.now()-(ex.used||0)});}
 
 function vExams(){ const G=GEN; const selArr=[...G.sel];
  const typesAvail=new Set();selArr.forEach(lk=>LKEY[lk].items.forEach(x=>{if(scorable(x.it))typesAvail.add(x.it.t)}));
@@ -409,7 +412,7 @@ function vExams(){ const G=GEN; const selArr=[...G.sel];
  const lessonsHTML=SKILLS.map(s=>{const Ls=LESSONS.filter(L=>L.sec===s.k&&(!G.q||L.lesson.includes(G.q)||s.k.includes(G.q)));if(!Ls.length)return"";const allOn=Ls.every(L=>G.sel.has(L.key));const some=Ls.some(L=>G.sel.has(L.key));
   return `<details class="gsec" ${some||G.q?"open":""}><summary><span class="chip c" style="--c:${s.c}">${s.g}</span>${s.k}<small class="muted">(${AR(Ls.length)})</small><button class="btn soft sm" data-selskill="${s.i}" style="margin-inline-start:8px">${allOn?"إلغاء الكل":"اختيار الكل"}</button><span class="caret">‹</span></summary>
   ${Ls.map(L=>`<label class="gl"><input type="checkbox" data-sel="${esc(L.key)}" ${G.sel.has(L.key)?"checked":""}><span class="lt">${esc(L.lesson)}<br><small>${s.k} · ${[...L.weeks].map(w=>WEEK_LABEL[w]).join("، ")}</small></span>${studyBtn(L.lesson,true)}<span class="chip">${AR(L.nScore)} سؤال</span></label>`).join("")}</details>`;}).join("");
- const hist=S.exams.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الامتحان</th><th>التاريخ</th><th>النتيجة</th><th></th></tr></thead><tbody>${S.exams.map(e=>`<tr><td><b>${esc(e.title)}</b><br><small class="muted">${AR(e.units.reduce((s,u)=>s+u.idx.length,0))} سؤال · ${e.cfg.sel.length} درس</small></td><td>${new Date(e.date).toLocaleDateString("ar-EG")}</td><td>${e.result?`<span class="chip ${e.result.pct>=50?"ok":"bad"}">${AR(e.result.pct)}٪</span>`:'<span class="chip">لم يُسلَّم</span>'}</td><td><div class="row">${e.result?`<button class="btn soft sm" data-review="${e.id}">مراجعة الأخطاء</button>`:""}<button class="btn sm" data-retake="${e.id}">إعادة</button><button class="btn ghost sm" data-regen="${e.id}">امتحان جديد بنفس الدروس</button></div></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">لا توجد امتحانات سابقة بعد.</div>`;
+ const hist=S.exams.length?`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الامتحان</th><th>التاريخ</th><th>النتيجة</th><th></th></tr></thead><tbody>${S.exams.map(e=>`<tr><td><b>${esc(e.title)}</b><br><small class="muted">${AR(e.units.reduce((s,u)=>s+u.idx.length,0))} سؤال · ${e.cfg.sel.length} درس</small></td><td>${new Date(e.date).toLocaleDateString("ar-EG")}</td><td>${e.result?`<span class="chip ${e.result.pct>=50?"ok":"bad"}">${AR(e.result.pct)}٪</span>`:`<span class="chip">لم يكتمل · أجاب ${AR(Object.keys(e.answers||{}).length)}</span>`}</td><td><div class="row">${e.result?`<button class="btn soft sm" data-review="${e.id}">مراجعة الأخطاء</button>`:`<button class="btn gold sm" data-resume="${e.id}">أكمل الامتحان ←</button>`}<button class="btn sm" data-retake="${e.id}">إعادة</button><button class="btn ghost sm" data-regen="${e.id}">امتحان جديد بنفس الدروس</button></div></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">لا توجد امتحانات سابقة بعد.</div>`;
  const estimate=Math.ceil(pickUnits(units,Math.min(G.n,max),G.dist,false).reduce((s,u)=>s+u.min,0));
  return `<div class="eyebrow">الاختبارات</div><h1>منشئ الامتحانات الذكي</h1><p class="muted">اختر الدروس من أي أسبوع وأي مهارة، وحدد عدد الأسئلة والمدة. كل الأسئلة من كتاب التقييمات فقط ومن قاعدة الأسئلة الموحدة نفسها، وتبقى النصوص مع أسئلتها.</p>
  <div class="row" style="margin:10px 0 18px"><button class="btn gold" id="finalExam">الاختبار الشامل (كل الدروس المتاحة)</button></div>
@@ -450,6 +453,7 @@ function bindExams(){const G=GEN;const re=()=>{const y=scrollY;route();scrollTo(
    <div style="max-height:220px;overflow:auto"><table class="tbl"><thead><tr><th>الدرس</th><th>الأسئلة</th></tr></thead><tbody>${Object.entries(per).map(([l,c])=>`<tr><td>${esc(l)}</td><td>${AR(c)}</td></tr>`).join("")}</tbody></table></div>
    <p class="muted" style="font-size:14px">النوع: ${({practice:"تدريبي",formal:"رسمي",revision:"مراجعة"})[G.mode]} · ${G.random?"ترتيب عشوائي":"بترتيب الكتاب"}</p>`,[["ابدأ الامتحان","go","gold"],["رجوع للتعديل",null,"ghost"]]);
   if(r==="go")launchExam({title,sel:new Set(G.sel),n:real,dist:G.dist,types:G.types,duration:G.duration,random:G.random,mode:G.mode,showAns:G.showAns},picked);};
+ $$("[data-resume]").forEach(b=>b.onclick=()=>{const e=S.exams.find(x=>x.id===b.dataset.resume);openExam(e,{...e.cfg,sel:new Set(e.cfg.sel),types:e.cfg.types?new Set(e.cfg.types):null});});
  $$("[data-retake]").forEach(b=>b.onclick=()=>{const e=S.exams.find(x=>x.id===b.dataset.retake);const cfg={...e.cfg,sel:new Set(e.cfg.sel),types:e.cfg.types?new Set(e.cfg.types):null};launchExam(cfg,e.units);});
  $$("[data-regen]").forEach(b=>b.onclick=()=>{const e=S.exams.find(x=>x.id===b.dataset.regen);const cfg={...e.cfg,sel:new Set(e.cfg.sel),types:e.cfg.types?new Set(e.cfg.types):null,random:true};const units=genUnits([...cfg.sel],cfg.types);launchExam(cfg,pickUnits(units,cfg.n,cfg.dist,true));});
  $$("[data-review]").forEach(b=>b.onclick=()=>{const e=S.exams.find(x=>x.id===b.dataset.review);const wrong=new Set(e.result.wrong);const units=e.units.map(u=>({b:u.b,idx:u.idx.filter(i=>wrong.has(u.b+"#"+i))})).filter(u=>u.idx.length);
