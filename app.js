@@ -100,6 +100,19 @@ function grade(it,v){
   case"blanks":{const parts=it.a.map((x,i)=>(v||[])[i]===x);return{ok:parts.every(Boolean),parts};}
   case"teacher":return{ok:null};
  }return{ok:false};}
+/* ---------- AI review of typed answers (server: api/grade.js) ----------
+   Keyword grading runs first; only answers it marks wrong go to the AI, which may accept them by meaning.
+   Any failure (offline, local preview, server error) keeps the keyword result. */
+const AI_TYPES=new Set(["kw","multi","essay"]);
+const gradeA=(it,a)=>{const g=grade(it,a.v);if(a.ai==="done")g.ok=a.ok;return g;};
+const needsAI=(it,v)=>AI_TYPES.has(it.t)&&scorable(it)&&isAnswered(it,v)&&!grade(it,v).ok;
+function aiPayload(key,it,v){const b=IT[key].b;let p=b.passage;if(p&&p.startsWith&&p.startsWith("P_"))p=PASSAGES[p];
+ return{id:key,type:it.t,question:(it.q||b.title||""),model:answerText(it)||"",context:typeof p==="string"?p:"",strict:!!it.st,min:it.min,
+  answer:it.t==="multi"?it.fields.map((f,i)=>f.l+": "+((v||[])[i]||"")).join("\n"):String(v||"")};}
+async function aiReview(list){const out={};
+ for(let i=0;i<list.length;i+=20){try{const r=await fetch("/api/grade",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({items:list.slice(i,i+20).map(x=>aiPayload(x.key,x.it,x.v))})});
+  if(!r.ok||!(r.headers.get("content-type")||"").includes("json"))continue;const j=await r.json();(j.results||[]).forEach(x=>out[x.id]=x);}catch(e){}}
+ return out;}
 function isAnswered(it,v){ if(v==null)return false;
  switch(it.t){case"mcq":return v>=0;case"kw":case"copy":case"essay":return String(v).trim().length>0;
   case"multi":return Array.isArray(v)&&v.some(x=>x&&x.trim());case"set":return Array.isArray(v)&&v.some(g=>g&&g.some(x=>x&&x.trim()));
@@ -293,19 +306,20 @@ function itemHTML(b,i,it,qn,n){ const key=b.id+"#"+i; const a=getA(key)||{}; con
   case"teacher":ctl=`<div class="note" style="margin:0">${esc(it.ans)}</div>`;break;
  }
  let fb="";
- if(showFB){ const g=it.t==="teacher"?{ok:null}:grade(it,v); const answered=isAnswered(it,v);
+ if(showFB){ const g=it.t==="teacher"?{ok:null}:gradeA(it,a);const aiN=a.aiNote?`<div class="ex">🤖 ${esc(a.aiNote)}</div>`:""; const answered=isAnswered(it,v);
   const right=`<div class="ans">الإجابة الصحيحة: ${esc(answerText(it))}</div>`; const ex=it.ex?`<div class="ex">${esc(it.ex)}</div>`:"";
   if(it.t==="teacher")fb="";
   else if(X.mode==="learn")fb=`<div class="fb info"><b>الإجابة</b>${right}${ex}${it.v?'<div class="ex">إجابة مقترحة تحتاج مراجعة المعلم.</div>':""}</div>`;
+  else if(a.ai==="pending")fb=`<div class="fb info"><b>🤖 جاري مراجعة إجابتك بالذكاء الاصطناعي…</b></div>`;
   else if(!answered)fb=`<div class="fb bad"><b>لم تتم الإجابة</b>${right}${ex}</div>`;
-  else if(g.ok)fb=`<div class="fb ok"><b>${["أحسنت! إجابة صحيحة","ممتاز!","رائع، استمر!","إجابة موفقة!"][qn%4]}</b>${it.t==="essay"?`<div>عدد الكلمات: ${AR(g.wc)} · تضمّن موضوعك عناصر الدرس. قارن موضوعك بالنموذج.</div>`:""}${ex}${it.v?'<div class="ex">إجابة مقترحة تحتاج مراجعة المعلم، لذلك لا تدخل في الدرجة.</div>':""}</div>`;
-  else fb=`<div class="fb bad"><b>${it.t==="essay"?"يحتاج موضوعك إلى تحسين":"إجابة غير صحيحة"}</b>${it.t==="essay"?`<div>عدد الكلمات: ${AR(g.wc)} (المطلوب ${AR(it.min)} على الأقل) · ${g.hits<it.need?"أضف أفكارًا ترتبط بعناصر الموضوع.":""}</div>`:right}${partsHint(it,g)}${ex}</div>`;
+  else if(g.ok)fb=`<div class="fb ok"><b>${["أحسنت! إجابة صحيحة","ممتاز!","رائع، استمر!","إجابة موفقة!"][qn%4]}</b>${aiN}${it.t==="essay"?`<div>عدد الكلمات: ${AR(g.wc)} · تضمّن موضوعك عناصر الدرس. قارن موضوعك بالنموذج.</div>`:""}${ex}${it.v?'<div class="ex">إجابة مقترحة تحتاج مراجعة المعلم، لذلك لا تدخل في الدرجة.</div>':""}</div>`;
+  else fb=`<div class="fb bad"><b>${it.t==="essay"?"يحتاج موضوعك إلى تحسين":"إجابة غير صحيحة"}</b>${aiN}${it.t==="essay"?`<div>عدد الكلمات: ${AR(g.wc)} (المطلوب ${AR(it.min)} على الأقل) · ${g.hits<it.need?"أضف أفكارًا ترتبط بعناصر الموضوع.":""}</div>`:right}${partsHint(it,g)}${ex}</div>`;
   if(it.t==="essay")fb+=modelHTML(it,X.mode==="learn");
  }
  let actions="";
  if(X.mode==="practice"&&it.t!=="teacher"){actions=a.done?`<div class="actions"><button class="btn soft sm" data-retry="${key}">حاول مرة أخرى</button></div>`:`<div class="actions"><button class="btn sm" data-check="${key}">تحقق من الإجابة</button>${it.t==="essay"?`<button class="btn soft sm" data-peek="${key}">عرض النموذج</button>`:""}</div>`;}
  if(it.t==="teacher"&&X.mode!=="learn"){actions=`<div class="actions"><button class="btn soft sm" data-tdone="${key}" ${a.v===true?"disabled":""}>${a.v===true?"✓ تم":"أنجزته (يصححه المعلم)"}</button></div>`;}
- const cls=showFB&&it.t!=="teacher"&&X.mode!=="learn"?(isAnswered(it,v)&&grade(it,v).ok?"ok":"bad"):"";
+ const cls=showFB&&it.t!=="teacher"&&X.mode!=="learn"?(a.ai==="pending"?"":isAnswered(it,v)&&gradeA(it,a).ok?"ok":"bad"):"";
  return `<div class="item ${cls}" id="it-${key.replace("#","_")}" data-item="${key}">${qtxt}${ctl}${actions}${fb}</div>`;}
 function partsHint(it,g){ if(it.t==="multi"&&g.parts)return `<div class="ex">${it.fields.map((f,i)=>`${g.parts[i]?"✓":"✗"} ${esc(f.l)}`).join(" · ")}</div>`; return "";}
 function modelHTML(it,open){const m=MODELS[it.model];if(!m)return"";return `<details class="model" ${open?"open":""}><summary>نموذج للطالب: ${esc(m.title)} (${AR(wordsOf(m.text).length)} كلمة)</summary><div class="rules">${m.rules.map(r=>`<span class="chip">${esc(r)}</span>`).join("")}</div><div class="mt">${esc(m.text)}</div></details>`;}
@@ -326,9 +340,15 @@ function readVal(el){const key=el.dataset.k;const x=IT[key];const a=Object.assig
 
 function checkItem(key,silent){const x=IT[key];const a=Object.assign({},getA(key)||{});const it=x.it;
  if(!isAnswered(it,a.v)){if(!silent)toast("أجب عن السؤال أولًا");return false;}
- const g=grade(it,a.v);const first=!a.tries;a.done=true;a.ok=!!g.ok;a.tries=(a.tries||0)+1;a.at=Date.now();
+ const g=grade(it,a.v);const first=!a.tries;a.done=true;a.ok=!!g.ok;a.tries=(a.tries||0)+1;a.at=Date.now();delete a.aiNote;a.ai=needsAI(it,a.v)?"pending":undefined;
+ if(a.ai)aiCheck(key,a.v,first);
  if(!SESSION.exam&&g.ok&&first&&scorable(it)){const p=it.t==="essay"?20:it.t==="copy"?5:10;a.pts=p;S.pts+=p;updatePts(true);}
- setA(key,a);if(!SESSION.exam){save();checkBadges();if(!silent&&scorable(it)&&window.malek)malek.answer(g.ok);}return true;}
+ setA(key,a);if(!SESSION.exam){save();checkBadges();if(!silent&&scorable(it)&&window.malek&&!a.ai)malek.answer(g.ok);}return true;}
+async function aiCheck(key,v,first){const X=SESSION;const r=(await aiReview([{key,it:IT[key].it,v}]))[key];
+ const a=Object.assign({},getA(key)||{});if(SESSION!==X||a.ai!=="pending"||a.v!==v)return; // answer changed meanwhile
+ a.ai="done";if(r){a.ok=!!r.ok;a.aiNote=r.feedback||"";}
+ if(!X.exam&&a.ok&&first){const p=IT[key].it.t==="essay"?20:10;a.pts=p;S.pts+=p;updatePts(true);}
+ setA(key,a);if(!X.exam){save();checkBadges();if(window.malek)malek.answer(a.ok);}refreshItem(key);updateSessMeta();}
 
 function bindView(r,arg){
  $$("[data-start-week]").forEach(b=>b.onclick=()=>{const w=b.dataset.startWeek;startSession({title:WEEK_LABEL[w]+" — كاملًا",units:unitsFromBlocks(BANK.filter(x=>wk(x.w)===wk(w))),mode:b.dataset.mode,nav:"weeks",back:"#week-"+w.toLowerCase()});});
@@ -348,7 +368,7 @@ function bindRun(){ const X=SESSION; updateSessMeta(); const app=$("#app"); if(w
  app.onkeydown=e=>{const el=e.target;if(e.key==="Enter"&&el.tagName==="INPUT"&&el.dataset.k&&X.mode==="practice"){e.preventDefault();if(checkItem(el.dataset.k))refreshItem(el.dataset.k);} if((e.key==="Enter"||e.key===" ")&&el.dataset.f==="sort-drop"){e.preventDefault();el.click();}};
  app.onclick=async e=>{const t=e.target.closest("[data-check],[data-retry],[data-peek],[data-tdone],[data-mode-switch],[data-f],#submitAll,#showResults,[data-jump]");if(!t)return;
   if(t.dataset.check){if(checkItem(t.dataset.check))refreshItem(t.dataset.check);const a=getA(t.dataset.check);if(a&&a.ok&&!X.exam)maybeBlockDone(t.dataset.check);return;}
-  if(t.dataset.retry){const a=Object.assign({},getA(t.dataset.retry));a.done=false;setA(t.dataset.retry,a);refreshItem(t.dataset.retry);return;}
+  if(t.dataset.retry){const a=Object.assign({},getA(t.dataset.retry));a.done=false;delete a.ai;delete a.aiNote;setA(t.dataset.retry,a);refreshItem(t.dataset.retry);return;}
   if(t.dataset.peek){if(window.malek)malek.help();const x=IT[t.dataset.peek];const el=t.closest(".item");if(!el.querySelector(".model"))el.insertAdjacentHTML("beforeend",modelHTML(x.it,true));return;}
   if(t.dataset.tdone){setA(t.dataset.tdone,{v:true,done:false});refreshItem(t.dataset.tdone);return;}
   if(t.dataset.modeSwitch){X.mode=t.dataset.modeSwitch;X.submitted=false;route();return;}
@@ -367,7 +387,12 @@ function maybeBlockDone(key){const b=IT[key].b;const ks=b.items.map((it,i)=>it.t
 
 async function submitAll(force){const X=SESSION;const un=X.order.filter(k=>!isAnswered(IT[k].it,(getA(k)||{}).v)&&IT[k].it.t!=="teacher").length;
  if(!force&&un){const r=await modal(`<h3>بقي ${AR(un)} سؤال بدون إجابة</h3><p class="muted">الأسئلة غير المُجاب عنها تُحسب إجابات غير صحيحة. هل تريد التسليم الآن؟</p>`,[["العودة للإجابة",false,"gold"],["تسليم الآن",true,"ghost"]]);if(!r){const k=X.order.find(k=>!isAnswered(IT[k].it,(getA(k)||{}).v)&&IT[k].it.t!=="teacher");const el=k&&document.getElementById("it-"+k.replace("#","_"));if(el)el.scrollIntoView({behavior:"smooth",block:"center"});return;}}
- clearInterval(TIMER);X.order.forEach(k=>{const a=Object.assign({},getA(k)||{});const it=IT[k].it;if(it.t==="teacher")return;const g=isAnswered(it,a.v)?grade(it,a.v):{ok:false};a.done=true;a.ok=!!g.ok;a.at=Date.now();setA(k,a);
+ clearInterval(TIMER);if(X.submitting)return;X.submitting=true;
+ const pend=X.order.map(k=>({key:k,it:IT[k].it,v:(getA(k)||{}).v})).filter(x=>needsAI(x.it,x.v));
+ let ai={};if(pend.length){toast("🤖 جاري مراجعة إجاباتك بالذكاء الاصطناعي…");const sb=$("#submitAll");if(sb){sb.disabled=true;sb.textContent="جاري المراجعة…";}ai=await aiReview(pend);}
+ if(SESSION!==X)return;
+ X.order.forEach(k=>{const a=Object.assign({},getA(k)||{});const it=IT[k].it;if(it.t==="teacher")return;const g=isAnswered(it,a.v)?grade(it,a.v):{ok:false};
+  const r=ai[k];if(r){g.ok=!!r.ok;a.aiNote=r.feedback||"";}a.ai=r?"done":undefined;a.done=true;a.ok=!!g.ok;a.at=Date.now();setA(k,a);
   if(X.exam&&scorable(it)){const prev=S.ans[k]||{};const first=!prev.tries;S.ans[k]=Object.assign({},prev,{v:a.v,done:true,ok:a.ok,tries:(prev.tries||0)+1,at:a.at});if(a.ok&&first){S.pts+=10;}}});
  X.submitted=true;if(!X.exam)save();const res=computeResults();
  if(X.exam){const ex=S.exams.find(e=>e.id===X.examId);if(ex){ex.result=res;ex.answers=X.local;ex.doneAt=Date.now();}save();}
@@ -590,7 +615,7 @@ function noteHTML(x,i){const h=x.h?`<h3>${esc(x.h)}</h3>`:"";let b="";
   case"vocab":b=`<div class="nb-stickies">${x.items.slice(0,8).map(v=>`<span class="nb-sticky"><b>${esc(v.w)}</b>${esc(brief(v.m))}</span>`).join("")}</div>`;break;
   case"rule":b=x.items.map(r=>`<p class="nb-rule"><b>${esc(r.k)}</b> ← ${hl(brief(r.v))}</p>`).join("");break;
   case"cases":b=`<ol class="nb-ol">${x.items.map(c=>`<li>${hl(brief(c.t))}<em> مثل: ${esc(c.ex)}</em></li>`).join("")}</ol>`;break;
-  case"examples":b=`<ul class="nb-ul">${x.rows.slice(0,4).map(r=>`<li>${r.map(hl).join(" ← ")}</li>`).join("")}</ul>`;break;
+  case"examples":b=`<ul class="nb-ul">${x.rows.slice(0,8).map(r=>`<li>${r.map(hl).join(" ← ")}</li>`).join("")}</ul>`;break;
   case"steps":b=`<div class="nb-flow">${x.items.map(s=>`<span>${esc(s.t)}</span>`).join("<i>⬅</i>")}</div>`;break;
   case"stairs":b=`<div class="nb-flow">${x.items.map(s=>`<span>${esc(s)}</span>`).join("<i>⬅</i>")}</div>${x.foot?`<p>${hl(brief(x.foot))}</p>`:""}`;break;
   case"compare":b=`<div class="nb-cmp"><span><b>${esc(x.a.t)}</b>${esc(x.a.d)}</span><i>≠</i><span><b>${esc(x.b.t)}</b>${esc(x.b.d)}</span></div>`;break;
