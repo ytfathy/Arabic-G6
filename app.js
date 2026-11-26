@@ -147,7 +147,7 @@ function confetti(){ if(matchMedia("(prefers-reduced-motion: reduce)").matches)r
  for(let i=0;i<70;i++){const p=document.createElement("i");p.style.left=Math.random()*100+"%";p.style.background=cols[i%cols.length];p.style.animationDelay=Math.random()*.6+"s";p.style.animationDuration=1.2+Math.random()+"s";c.appendChild(p);} document.body.appendChild(c);setTimeout(()=>c.remove(),2600);}
 function modal(html,buttons){return new Promise(res=>{const bg=document.createElement("div");bg.className="modal-bg";bg.innerHTML=`<div class="modal" role="dialog" aria-modal="true">${html}<div class="row" style="margin-top:18px;justify-content:flex-start"></div></div>`;
  const row=$(".row",bg);buttons.forEach(([label,val,cls])=>{const b=document.createElement("button");b.className="btn "+(cls||"");b.textContent=label;b.onclick=()=>{bg.remove();res(val)};row.appendChild(b);});
- bg.addEventListener("click",e=>{if(e.target===bg){bg.remove();res(null)}});document.body.appendChild(bg);row.firstChild&&row.firstChild.focus();});}
+ bg.addEventListener("click",e=>{if(e.target===bg){bg.remove();res(null)}});document.body.appendChild(bg);row.firstChild&&row.firstChild.focus({preventScroll:true});});}
 function updatePts(bump){$("#ptsN").textContent=AR(S.pts);if(bump){const p=$("#pts");p.classList.remove("bump");void p.offsetWidth;p.classList.add("bump");}}
 function ring(p,size=54,stroke=6,col="var(--navy)"){const r=(size-stroke)/2,c=2*Math.PI*r;return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="ring" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--paper2)" stroke-width="${stroke}"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${col}" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}" transform="rotate(-90 ${size/2} ${size/2})"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-size="${size/4}" font-weight="700" fill="var(--ink)" font-family="IBM Plex Sans Arabic">${AR(Math.round(p*100))}٪</text></svg>`;}
 const pct=(a,b)=>b?Math.round(a/b*100):0;
@@ -282,9 +282,10 @@ const WORD_BANK=(()=>{const R=window.REVISION||{};
   mk("s","اختر مفرد الكلمة",pl.map(r=>mcq(`ما مفرد كلمة «${r[1]}»؟`,r[0],D("sg",r[1],r[0])||pl.map(x=>x[0]),pool.s,id+r[1]+"s")));
   blocks.forEach(b=>{BLOCK[b.id]=b;b.items.forEach((it,i)=>IT[b.id+"#"+i]={key:b.id+"#"+i,b,i,it});});
   return{id,title:c.title,sec:c.kind,lesson:blocks[0].lesson,blocks,items:blocks.flatMap(b=>b.items.map((it,i)=>IT[b.id+"#"+i]))};});})();
+const touched=x=>{const a=S.ans[x.key];return !!a&&(a.done||a.v!=null);};
 function vWords(){const all=WORD_BANK.flatMap(L=>L.items);
- return `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h1>بنك الكلمات</h1><p class="muted" style="margin:0">أسئلة اختيار من متعدد على معاني الكلمات والمفرد والجمع لدروس القراءة والنصوص والاستماع · ${AR(all.length)} سؤال</p></div><button class="btn" data-start-words="all">تدرّب على كل الكلمات</button></div>
- <div class="lesson-list" style="margin-top:16px">${WORD_BANK.map((L,i)=>{const st=stats(L.items);const c=SK[L.sec].c;return `<div class="lesson"><button class="lt plain" data-start-words="${i}"><b>${esc(L.title)}</b><span>${L.sec} · ${AR(L.items.length)} سؤال · ${L.blocks.map(b=>b.title.replace("اختر ","")).join("، ")}</span></button>${studyBtn(L.lesson)}${ring(st.total?st.att/st.total:0,54,6,c)}</div>`;}).join("")}</div>`;}
+ return `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h1>بنك الكلمات</h1><p class="muted" style="margin:0">أسئلة اختيار من متعدد على معاني الكلمات والمفرد والجمع لدروس القراءة والنصوص والاستماع · ${AR(all.length)} سؤال</p></div><div class="row"><button class="btn" data-start-words="all">تدرّب على كل الكلمات</button>${all.some(touched)?`<button class="btn soft" data-start-words="all" data-redo="1">↺ إعادة كل الأسئلة</button>`:""}</div></div>
+ <div class="lesson-list" style="margin-top:16px">${WORD_BANK.map((L,i)=>{const st=stats(L.items);const c=SK[L.sec].c;return `<div class="lesson"><button class="lt plain" data-start-words="${i}"><b>${esc(L.title)}</b><span>${L.sec} · ${AR(L.items.length)} سؤال · ${L.blocks.map(b=>b.title.replace("اختر ","")).join("، ")}</span></button>${L.items.some(touched)?`<button class="btn soft sm" data-start-words="${i}" data-redo="1">↺ إعادة الأسئلة</button>`:""}${studyBtn(L.lesson)}${ring(st.total?st.att/st.total:0,54,6,c)}</div>`;}).join("")}</div>`;}
 
 /* ---------- session ---------- */
 function unitsFromBlocks(blocks){return blocks.map(b=>({b:b.id,idx:b.items.map((it,i)=>it.t?i:null).filter(i=>i!=null)}));}
@@ -313,7 +314,7 @@ function vRun(){ const X=SESSION; const n=X.order.length;
   <div class="sess-meta"><span id="sessCount"></span><div class="bar navy"><i id="sessBar" style="width:0"></i></div>${X.duration?`<span class="timer" id="timer"></span>`:""}<span class="chip" id="modeChip"></span></div></div>
   ${X.mode==="test"&&!X.submitted?`<div class="alert">وضع الاختبار: لن تظهر الإجابات حتى تضغط «تسليم» في نهاية الصفحة.</div>`:""}
   ${X.mode==="learn"?`<div class="alert" style="background:#EEF2FC;color:var(--navy2)">وضع التعلّم: تظهر الإجابة الصحيحة والشرح تحت كل سؤال.</div>`:""}
-  <div id="resultsTop"></div>${body}
+  ${body}<div id="resultsTop"></div>
   <div class="sess-foot">${X.mode==="test"&&!X.submitted?`<button class="btn gold" id="submitAll">تسليم ${X.exam?"الامتحان":"الاختبار"}</button>`:`<button class="btn" id="showResults">${X.submitted?"عرض النتائج":"إنهاء وعرض النتائج"}</button>`}<a class="btn soft" href="${X.back||"#home"}">خروج</a></div>`;}
 
 function itemHTML(b,i,it,qn,n){ const key=b.id+"#"+i; const a=getA(key)||{}; const v=a.v; const X=SESSION;
@@ -387,7 +388,7 @@ function bindView(r,arg){
  $$("[data-start-week]").forEach(b=>b.onclick=()=>{const w=b.dataset.startWeek;startSession({title:WEEK_LABEL[w]+" — كاملًا",units:unitsFromBlocks(BANK.filter(x=>wk(x.w)===wk(w))),mode:b.dataset.mode,nav:"weeks",back:"#week-"+w.toLowerCase()});});
  $$("[data-start-period]").forEach(b=>b.onclick=()=>{const [w,p]=b.dataset.startPeriod.split("|");const bs=BANK.filter(x=>wk(x.w)===w&&x.p===+p);startSession({title:WEEK_LABEL[w]+" — "+PERIOD_NAME[p],units:unitsFromBlocks(bs),mode:"practice",nav:"weeks",back:"#week-"+w.toLowerCase()});});
  $$("[data-start-skill]").forEach(b=>b.onclick=()=>{const s=SKILLS[+b.dataset.startSkill];const bs=LESSONS.filter(L=>L.sec===s.k).flatMap(L=>L.blocks);startSession({title:"مهارة: "+s.k,units:unitsFromBlocks(bs),nav:"skills",back:"#skill-"+b.dataset.startSkill});});
- $$("[data-start-words]").forEach(b=>b.onclick=()=>{const k=b.dataset.startWords;const Ls=k==="all"?WORD_BANK:[WORD_BANK[+k]];startSession({title:"بنك الكلمات"+(k==="all"?"":" — "+Ls[0].title),units:unitsFromBlocks(Ls.flatMap(L=>L.blocks)),nav:"words",back:"#words"});});
+ $$("[data-start-words]").forEach(b=>b.onclick=()=>{const k=b.dataset.startWords;const Ls=k==="all"?WORD_BANK:[WORD_BANK[+k]];if(b.dataset.redo){Ls.forEach(L=>L.items.forEach(x=>{if(S.ans[x.key])S.ans[x.key]=Object.assign({},S.ans[x.key],{done:false,v:undefined,ai:undefined,aiNote:undefined});}));save();}startSession({title:"بنك الكلمات"+(k==="all"?"":" — "+Ls[0].title),units:unitsFromBlocks(Ls.flatMap(L=>L.blocks)),nav:"words",back:"#words"});});
  $$("[data-start-lesson]").forEach(b=>b.onclick=()=>{const L=LESSONS[+b.dataset.startLesson];startSession({title:L.lesson,units:unitsFromBlocks(L.blocks),mode:b.dataset.mode,nav:"skills",back:"#lesson-"+L.idx});});
  if(r==="run")bindRun();
  if(r==="exams")bindExams();
@@ -420,7 +421,7 @@ function bindRun(){ const X=SESSION; updateSessMeta(); const app=$("#app"); if(w
 function maybeBlockDone(key){const b=IT[key].b;const ks=b.items.map((it,i)=>it.t&&scorable(it)?b.id+"#"+i:null).filter(Boolean);if(ks.length>1&&ks.every(k=>{const a=getA(k);return a&&a.done&&a.ok})){confetti();toast("🎉 أحسنت! أجبت عن النشاط كله إجابة صحيحة");}}
 
 async function submitAll(force){const X=SESSION;const un=X.order.filter(k=>!isAnswered(IT[k].it,(getA(k)||{}).v)&&IT[k].it.t!=="teacher").length;
- if(!force&&un){const r=await modal(`<h3>بقي ${AR(un)} سؤال بدون إجابة</h3><p class="muted">الأسئلة غير المُجاب عنها تُحسب إجابات غير صحيحة. هل تريد التسليم الآن؟</p>`,[["العودة للإجابة",false,"gold"],["تسليم الآن",true,"ghost"]]);if(!r){const k=X.order.find(k=>!isAnswered(IT[k].it,(getA(k)||{}).v)&&IT[k].it.t!=="teacher");const el=k&&document.getElementById("it-"+k.replace("#","_"));if(el)el.scrollIntoView({behavior:"smooth",block:"center"});return;}}
+ if(!force&&un){const r=await modal(`<h3>بقي ${AR(un)} سؤال بدون إجابة</h3><p class="muted">الأسئلة غير المُجاب عنها تُحسب إجابات غير صحيحة. هل تريد التسليم الآن؟</p>`,[["العودة للإجابة",false,"gold"],["تسليم الآن",true,"ghost"]]);if(!r){const k=X.order.find(k=>!isAnswered(IT[k].it,(getA(k)||{}).v)&&IT[k].it.t!=="teacher");if(k)toast("أول سؤال بدون إجابة: س "+AR(X.order.indexOf(k)+1));return;}}
  clearInterval(TIMER);if(X.submitting)return;X.submitting=true;
  const pend=X.order.map(k=>({key:k,it:IT[k].it,v:(getA(k)||{}).v})).filter(x=>needsAI(x.it,x.v));
  let ai={};if(pend.length){toast("🤖 جاري مراجعة إجاباتك بالذكاء الاصطناعي…");const sb=$("#submitAll");if(sb){sb.disabled=true;sb.textContent="جاري المراجعة…";}ai=await aiReview(pend);}
@@ -444,7 +445,7 @@ function showResults(){const X=SESSION;const r=computeResults();const top=$("#re
  <div><h3>الأداء حسب المهارة</h3><div class="hbars">${Object.entries(r.bySkill).map(([s,v])=>`<div class="hbar"><span>${s}</span><div class="bar"><i style="width:${pct(v.o,v.t)}%;background:${SK[s].c}"></i></div><span>${AR(v.o)}/${AR(v.t)}</span></div>`).join("")}</div></div></div>
  ${r.wrong.length?`<h3 style="margin-top:16px">أسئلة تحتاج إلى مراجعة (${AR(r.wrong.length)})</h3><div class="row">${r.wrong.slice(0,60).map(k=>`<button class="chip bad" style="border:0;cursor:pointer" data-jump="${k}">س ${AR(X.order.indexOf(k)+1)}</button>`).join("")}</div>`:`<p>لا توجد أخطاء — أحسنت!</p>`}
  <div class="row" style="margin-top:14px">${X.mode!=="test"||X.submitted?`<button class="btn" id="retakeBtn">إعادة المحاولة</button>`:""}<a class="btn soft" href="#progress">نتائجي وتقدمي</a></div></div>`;
- top.scrollIntoView({behavior:"smooth"}); if(r.pct>=90)confetti(); if(window.malek){if(r.pct<50)malek.incorrect();else if(X.exam)malek.levelComplete();else malek.lessonComplete();}
+ toast("📊 ظهرت النتيجة في آخر الصفحة");if(r.pct>=90)confetti(); if(window.malek){if(r.pct<50)malek.incorrect();else if(X.exam)malek.levelComplete();else malek.lessonComplete();}
  const rb=$("#retakeBtn");if(rb)rb.onclick=()=>{const o={title:X.title,units:X.units,mode:X.exam?X.mode:X.mode,nav:X.nav,back:X.back,exam:X.exam,duration:X.duration,showAns:X.showAns};
   if(X.exam){const ex=newExamRecord(X.cfg,X.units);o.examId=ex.id;o.cfg=X.cfg;} else {X.order.forEach(k=>{const a=Object.assign({},S.ans[k]||{});a.done=false;a.v=undefined;S.ans[k]=a;});save();}
   startSession(o);};}
@@ -496,7 +497,7 @@ function bindExams(){const G=GEN;const re=()=>{const y=scrollY;route();scrollTo(
  $$("[data-selskill]").forEach(b=>b.onclick=e=>{e.preventDefault();const s=SKILLS[+b.dataset.selskill];const Ls=LESSONS.filter(L=>L.sec===s.k);const all=Ls.every(L=>G.sel.has(L.key));Ls.forEach(L=>all?G.sel.delete(L.key):G.sel.add(L.key));re();});
  $$("[data-selweek]").forEach(b=>b.onclick=()=>{LESSONS.filter(L=>L.weeks.has(b.dataset.selweek)).forEach(L=>G.sel.add(L.key));re();});
  $("#selAll").onclick=()=>{LESSONS.forEach(L=>G.sel.add(L.key));re();};$("#selNone").onclick=()=>{G.sel.clear();re();};
- const ls=$("#lsearch");ls.oninput=()=>{G.q=ls.value.trim();clearTimeout(ls._t);ls._t=setTimeout(()=>{re();const n=$("#lsearch");n.focus();n.setSelectionRange(n.value.length,n.value.length);},350);};
+ const ls=$("#lsearch");ls.oninput=()=>{G.q=ls.value.trim();clearTimeout(ls._t);ls._t=setTimeout(()=>{re();const n=$("#lsearch");n.focus({preventScroll:true});n.setSelectionRange(n.value.length,n.value.length);},350);};
  $("#gTitle").oninput=e=>G.title=e.target.value;
  $("#gN").onchange=e=>{G.n=Math.max(1,parseInt(e.target.value)||1);re();};const um=$("#useMax");if(um)um.onclick=()=>{G.n=+$("#gN").max;re();};
  $("#gDist").onchange=e=>{G.dist=e.target.value;re();};$("#gDur").onchange=e=>{G.duration=Math.max(0,parseInt(e.target.value)||0);};
@@ -545,7 +546,8 @@ function vKey(){ const F=KEYF;const blocks=BANK.filter(b=>(!F.w||wk(b.w)===F.w)&
  <div class="filters"><select id="kW"><option value="">كل الأسابيع</option>${AVAILABLE_WEEKS.map(w=>`<option value="${w}" ${F.w===w?"selected":""}>${WEEK_LABEL[w]}</option>`).join("")}</select>
  <select id="kS"><option value="">كل المهارات</option>${SKILLS.filter(s=>BANK.some(b=>b.sec===s.k)).map(s=>`<option ${F.s===s.k?"selected":""}>${s.k}</option>`).join("")}</select><input id="kQ" placeholder="بحث في الأسئلة…" value="${esc(F.q)}" style="flex:1;min-width:180px"></div>
  ${blocks.length?blocks.map(b=>{const sk=SK[b.sec];return `<article class="block" style="--c:${sk.c}"><div class="block-h"><span class="tag"></span><div style="flex:1"><h3>${esc(b.title)}</h3><div class="meta"><span class="chip c" style="--c:${sk.c}">${b.sec}</span><span class="chip">${esc(b.lesson)}</span><span class="chip">${WEEK_LABEL[b.w]}${b.p?" · "+PERIOD_NAME[b.p]:""}${b.grp?" · مجموعة "+b.grp:""}</span><span class="chip">ص ${AR(b.page)}</span>${studyBtn(b.lesson,true)}</div></div></div>${b.note?`<div class="note">${esc(b.note)}</div>`:""}${b.source?`<div class="note" style="background:#EEF2FC;color:var(--navy2)">${esc(b.source)}</div>`:""}${listenHTML(b)}${passageHTML(b)}<div class="items">${b.items.map((it,i)=>it.t?`<div class="key-item"><div>${fmtQ(it.t==="blanks"?it.q.replace(/\{\d\}/g,"……"):it.q||"")}${it.t==="mcq"?` <span class="muted">(${it.opts.map(esc).join(" – ")})</span>`:""}${it.v?'<span class="vflag">مراجعة المعلم</span>':""}</div><div class="ka">✓ ${esc(answerText(it))}</div>${it.ex?`<div class="muted" style="font-size:15px">${esc(it.ex)}</div>`:""}${it.t==="essay"?modelHTML(it,false):""}</div>`:`<div class="sub">${esc(it.sub)}</div>`).join("")}</div></article>`;}).join(""):`<div class="empty">لا توجد نتائج.</div>`}`;}
-function bindKey(){const F=KEYF;$("#kW").onchange=e=>{F.w=e.target.value;route();};$("#kS").onchange=e=>{F.s=e.target.value;route();};const q=$("#kQ");q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{F.q=q.value.trim();route();const n=$("#kQ");n.focus();n.setSelectionRange(n.value.length,n.value.length);},400);};}
+function bindKey(){const F=KEYF;const re=()=>{const y=scrollY;route();scrollTo(0,y);}; // filters re-render in place, the page stays where the student is
+ $("#kW").onchange=e=>{F.w=e.target.value;re();};$("#kS").onchange=e=>{F.s=e.target.value;re();};const q=$("#kQ");q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{F.q=q.value.trim();re();const n=$("#kQ");n.focus({preventScroll:true});n.setSelectionRange(n.value.length,n.value.length);},400);};}
 
 /* ---------- read aloud (speech) ---------- */
 let SPK=null, VOICE=null;
@@ -681,7 +683,7 @@ const Reader={segs:[],i:0,j:0,state:"idle",rate:.85,
   R.segs.forEach((s,si)=>{s.el.addEventListener("dblclick",()=>R.play(si));});R.ui();},
  ui(){const st=this.state,set=(id,d)=>{const b=$("#"+id);if(b)b.disabled=d;};set("plPause",st!=="playing");set("plResume",st!=="paused");set("plStop",st==="idle");
   const m=$("#plMain");if(m)m.classList.toggle("on",st==="playing");const s=$("#plStat");if(s)s.textContent=st==="idle"?"":`${st==="paused"?"متوقف مؤقتًا · ":""}الجزء ${AR(this.i+1)} من ${AR(this.segs.length)}`;},
- mark(){$$(".reading").forEach(e=>e.classList.remove("reading"));const s=this.segs[this.i];if(!s)return;s.el.classList.add("reading");const r=s.el.getBoundingClientRect();if(r.top<120||r.bottom>innerHeight-40)s.el.scrollIntoView({behavior:"smooth",block:"center"});},
+ mark(){$$(".reading").forEach(e=>e.classList.remove("reading"));const s=this.segs[this.i];if(!s)return;s.el.classList.add("reading");},
  play(from){const sy=window.speechSynthesis;if(!sy||!window.SpeechSynthesisUtterance){toast("القراءة الصوتية غير متاحة على هذا الجهاز");return;}
   stopSpeak();try{sy.cancel();}catch(_){} this.i=from||0;this.j=0;this.state="playing";this.gen=(this.gen||0)+1;this.ui();
   if(!VOICE)VOICE=pickVoice(); if(!VOICE&&sy.getVoices().length)toast("لا يوجد صوت عربي مثبت على هذا الجهاز؛ أضِفه من إعدادات (تحويل النص إلى كلام) لقراءة أوضح");
