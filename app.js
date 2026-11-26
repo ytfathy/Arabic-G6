@@ -179,13 +179,13 @@ function checkBadges(){const before=new Set(S.badges);const okCount=Object.value
  if(S.exams.some(e=>e.result))give("exam");if(S.exams.some(e=>e.result&&e.result.pct>=90))give("exam90");}
 
 /* ---------- nav & routing ---------- */
-const ICON={home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+const ICON={words:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 8h6M9 12h4"/></svg>',home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
  weeks:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
  skills:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2zM8 7h6M8 11h6"/></svg>',
  exams:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/></svg>',
  progress:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
  key:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>'};
-const NAV=[["home","الصفحة الرئيسية","الرئيسية"],["weeks","التقييمات الأسبوعية","الأسبوعية"],["skills","التدريب حسب المهارة","المهارات"],["exams","الاختبارات","الاختبارات"],["progress","نتائجي وتقدمي","تقدمي"],["key","دليل الإجابات","الإجابات"]];
+const NAV=[["home","الصفحة الرئيسية","الرئيسية"],["weeks","التقييمات الأسبوعية","الأسبوعية"],["skills","التدريب حسب المهارة","المهارات"],["exams","الاختبارات","الاختبارات"],["progress","نتائجي وتقدمي","تقدمي"],["words","بنك الكلمات","الكلمات"],["key","دليل الإجابات","الإجابات"]];
 const mob=()=>matchMedia("(max-width:720px)").matches;
 function drawNav(cur){$("#nav").innerHTML=NAV.map(([h,l,s])=>`<a href="#${h}" class="${cur===h?"on":""}" ${cur===h?'aria-current="page"':""}>${ICON[h]}<span>${mob()?s:l}</span></a>`).join("");}
 let SESSION=null,TIMER=null;
@@ -194,9 +194,9 @@ let PREV_SESSION=null;
 function route(){ if(ROUTING)return; ROUTING=true; if(SESSION&&/^#study-/.test(location.hash))PREV_SESSION=SESSION; try{ const ae=document.activeElement; if(ae&&ae!==document.body&&ae.blur)ae.blur(); routeInner(); } finally { ROUTING=false; } }
 function routeInner(){ const h=(location.hash||"#home").slice(1); if(h!=="run"&&SESSION){if(SESSION.submitted&&h!=="home"&&window.malek)malek.goodbye();endSessionSilently();}
  const [r,arg]=(()=>{const m=h.match(/^([a-z]+)-?([\w-]*)$/i);return m?[m[1],m[2]]:["home",""]})();
- const navCur={study:"skills",notes:"skills",home:"home",weeks:"weeks",week:"weeks",skills:"skills",skill:"skills",lesson:"skills",exams:"exams",progress:"progress",key:"key",run:SESSION?SESSION.nav:"home"}[r]||"home";
+ const navCur={study:"skills",notes:"skills",home:"home",weeks:"weeks",week:"weeks",skills:"skills",skill:"skills",lesson:"skills",exams:"exams",progress:"progress",key:"key",words:"words",run:SESSION?SESSION.nav:"home"}[r]||"home";
  drawNav(navCur); const app=$("#app"); window.scrollTo(0,0);
- const V={study:()=>vStudy(arg),notes:()=>vNotes(arg),home:vHome,weeks:vWeeks,week:()=>vWeek(arg),skills:vSkills,skill:()=>vSkill(+arg),lesson:()=>vLesson(+arg),exams:vExams,progress:vProgress,key:vKey,run:vRun}[r]||vHome;
+ const V={study:()=>vStudy(arg),notes:()=>vNotes(arg),home:vHome,weeks:vWeeks,week:()=>vWeek(arg),skills:vSkills,skill:()=>vSkill(+arg),lesson:()=>vLesson(+arg),exams:vExams,progress:vProgress,key:vKey,words:vWords,run:vRun}[r]||vHome;
  if(r==="run"&&!SESSION){setTimeout(()=>{location.hash="#home";});return;}
  app.innerHTML=`<div class="view">${V()}</div>`; bindView(r,arg); }
 window.addEventListener("hashchange",route);
@@ -253,6 +253,39 @@ function vLesson(i){ const L=LESSONS[i]; if(!L)return vSkills(); const s=SK[L.se
  <div class="row">${studyBtn(L.lesson,false,true)}${notesBtn(L.lesson)}<button class="btn" data-start-lesson="${i}" data-mode="practice">تدريب</button><button class="btn soft" data-start-lesson="${i}" data-mode="learn">تعلّم مع الإجابات</button><button class="btn ghost" data-start-lesson="${i}" data-mode="test">اختبار الدرس</button></div>
  <h3 style="margin-top:22px">محتوى الدرس</h3><div class="lesson-list">${L.blocks.map(b=>`<div class="lesson"><span class="lt"><b>${esc(b.title)}</b><span>${WEEK_LABEL[b.w]} · ${PERIOD_NAME[b.p]}${b.grp?" · المجموعة ("+b.grp+")":""} · ${KIND_LABEL[b.kind]} · ص ${AR(b.page)}</span></span></div>`).join("")}</div>`;}
 
+/* ---------- بنك الكلمات: MCQs from the «ذاكر لي» vocab and plural tables of the reading, texts & listening lessons ----------
+   Kept out of BANK/ITEMS so weeks, skills, exams and progress stay as in the book. Order is seeded, so saved answers keep matching. */
+WEEK_LABEL.WB="بنك الكلمات";
+const WORD_BANK=(()=>{const R=window.REVISION||{};
+ const bare=t=>String(t).replace(/[\u064B-\u0652\u0640]/g,"").replace(/^ال/,"").trim();
+ const shuffle=(arr,key)=>{arr=arr.slice();let h=7;for(const c of key)h=(h*31+c.charCodeAt(0))>>>0;
+  const rnd=()=>{h=(h+0x6D2B79F5)>>>0;let r=Math.imul(h^(h>>>15),1|h);r^=r+Math.imul(r^(r>>>7),61|r);return((r^(r>>>14))>>>0)/4294967296;}; // mulberry32: a plain LCG put every answer in the last slot
+  for(let i=arr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
+ const cards=Object.entries(R).filter(([,c])=>["القراءة","النصوص","الاستماع"].includes(c.kind)).map(([id,c])=>({id,c,
+   vocab:c.sections.filter(x=>x.type==="vocab").flatMap(x=>x.items),
+   pl:(c.sections.find(x=>x.type==="examples"&&/جمع/.test(x.h))||{rows:[]}).rows,
+   ord:LESSONS.findIndex(L=>(c.lessons||[]).includes(L.lesson))}))
+  .filter(x=>x.vocab.length||x.pl.length).sort((a,b)=>(a.ord<0?999:a.ord)-(b.ord<0?999:b.ord));
+ const pool={m:cards.flatMap(x=>x.vocab.map(v=>v.m)),p:cards.flatMap(x=>x.pl.map(r=>r[1])),s:cards.flatMap(x=>x.pl.map(r=>r[0]))};
+ // wrong options: same lesson first, then other lessons; never one that reads the same as the answer
+ const mcq=(q,right,local,all,key)=>{const seen=new Set([bare(right)]),wrong=[];
+  for(const o of [...shuffle(local,key),...shuffle(all,key+"*")]){if(wrong.length===3)break;if(!seen.has(bare(o))){seen.add(bare(o));wrong.push(o);}}
+  const opts=shuffle([right,...wrong],key+"#");return{t:"mcq",q,opts,a:opts.indexOf(right)};};
+ return cards.map(({id,c,vocab,pl})=>{const blocks=[];
+  const mk=(suf,title,items)=>{if(items.length)blocks.push({id:"wb-"+id+"-"+suf,w:"WB",p:0,kind:"review",sec:c.kind,lesson:(c.lessons||[])[0]||c.title,title,items});};
+  mk("m","اختر معنى الكلمة",vocab.map(v=>mcq(`ما معنى كلمة «${v.w}»؟`,v.m,vocab.map(x=>x.m),pool.m,id+v.w)));
+  // hand-written look-alike options (data/wordbank.js) first; other words of the lesson only if a word has none
+  // the options follow the answer's tashkeel (none if the answer has none), so the vowels don't give it away
+  const D=(kind,w,right)=>{const o=((window.WORD_DISTRACTORS||{})[kind]||{})[String(w).replace(/[ً-ْ]/g,"")];
+   return o&&(/[ً-ِْ]/.test(right)?o:o.map(x=>x.replace(/[ً-ِْ]/g,"")));};
+  mk("p","اختر جمع الكلمة",pl.map(r=>mcq(`ما جمع كلمة «${r[0]}»؟`,r[1],D("pl",r[0],r[1])||pl.map(x=>x[1]),pool.p,id+r[0]+"p")));
+  mk("s","اختر مفرد الكلمة",pl.map(r=>mcq(`ما مفرد كلمة «${r[1]}»؟`,r[0],D("sg",r[1],r[0])||pl.map(x=>x[0]),pool.s,id+r[1]+"s")));
+  blocks.forEach(b=>{BLOCK[b.id]=b;b.items.forEach((it,i)=>IT[b.id+"#"+i]={key:b.id+"#"+i,b,i,it});});
+  return{id,title:c.title,sec:c.kind,lesson:blocks[0].lesson,blocks,items:blocks.flatMap(b=>b.items.map((it,i)=>IT[b.id+"#"+i]))};});})();
+function vWords(){const all=WORD_BANK.flatMap(L=>L.items);
+ return `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><h1>بنك الكلمات</h1><p class="muted" style="margin:0">أسئلة اختيار من متعدد على معاني الكلمات والمفرد والجمع لدروس القراءة والنصوص والاستماع · ${AR(all.length)} سؤال</p></div><button class="btn" data-start-words="all">تدرّب على كل الكلمات</button></div>
+ <div class="lesson-list" style="margin-top:16px">${WORD_BANK.map((L,i)=>{const st=stats(L.items);const c=SK[L.sec].c;return `<div class="lesson"><button class="lt plain" data-start-words="${i}"><b>${esc(L.title)}</b><span>${L.sec} · ${AR(L.items.length)} سؤال · ${L.blocks.map(b=>b.title.replace("اختر ","")).join("، ")}</span></button>${studyBtn(L.lesson)}${ring(st.total?st.att/st.total:0,54,6,c)}</div>`;}).join("")}</div>`;}
+
 /* ---------- session ---------- */
 function unitsFromBlocks(blocks){return blocks.map(b=>({b:b.id,idx:b.items.map((it,i)=>it.t?i:null).filter(i=>i!=null)}));}
 function startSession(o){ SESSION=Object.assign({mode:"practice",exam:false,local:{},submitted:false,nav:"weeks",started:Date.now()},o);
@@ -274,7 +307,7 @@ function vRun(){ const X=SESSION; const n=X.order.length;
      if(u.idx.some(j=>j>i))lastSub=it.sub; return;}
    if(!u.idx.includes(i))return; if(lastSub){inner+=`<div class="sub">${esc(lastSub)}</div>`;lastSub=null;}
    qn++; inner+=itemHTML(b,i,it,qn,n); });
-  return pre+`<article class="block" style="--c:${sk.c}" id="blk-${b.id}"><div class="block-h"><span class="tag"></span><div style="flex:1"><h3>${esc(b.title)}</h3><div class="meta"><span class="chip c" style="--c:${sk.c}">${b.sec}</span><span class="chip">${esc(b.lesson)}</span><span class="chip">${WEEK_LABEL[b.w]}${b.p?" · "+PERIOD_NAME[b.p]:""}${b.grp?" · مجموعة "+b.grp:""}</span><span class="chip">ص ${AR(b.page)}</span>${studyBtn(b.lesson,true)}</div></div></div>${b.note?`<div class="note">${esc(b.note)}</div>`:""}${b.source?`<div class="note" style="background:#EEF2FC;color:var(--navy2)">${esc(b.source)}</div>`:""}${listenHTML(b)}${passageHTML(b)}<div class="items">${inner}</div></article>`;}).join("");
+  return pre+`<article class="block" style="--c:${sk.c}" id="blk-${b.id}"><div class="block-h"><span class="tag"></span><div style="flex:1"><h3>${esc(b.title)}</h3><div class="meta"><span class="chip c" style="--c:${sk.c}">${b.sec}</span><span class="chip">${esc(b.lesson)}</span><span class="chip">${WEEK_LABEL[b.w]}${b.p?" · "+PERIOD_NAME[b.p]:""}${b.grp?" · مجموعة "+b.grp:""}</span>${b.page?`<span class="chip">ص ${AR(b.page)}</span>`:""}${studyBtn(b.lesson,true)}</div></div></div>${b.note?`<div class="note">${esc(b.note)}</div>`:""}${b.source?`<div class="note" style="background:#EEF2FC;color:var(--navy2)">${esc(b.source)}</div>`:""}${listenHTML(b)}${passageHTML(b)}<div class="items">${inner}</div></article>`;}).join("");
  const modes=X.exam?"":`<div class="seg" role="tablist" aria-label="وضع الحل">${[["practice","تدريب"],["learn","تعلّم"],["test","اختبار"]].map(([m,l])=>`<button role="tab" aria-selected="${X.mode===m}" class="${X.mode===m?"on":""}" data-mode-switch="${m}">${l}</button>`).join("")}</div>`;
  return `<div class="sess-head"><div class="row" style="justify-content:space-between"><h2>${esc(X.title)}</h2><div class="row">${modes}<button class="btn soft sm no-print" type="button" onclick="print()">🖨️ طباعة</button></div></div>
   <div class="sess-meta"><span id="sessCount"></span><div class="bar navy"><i id="sessBar" style="width:0"></i></div>${X.duration?`<span class="timer" id="timer"></span>`:""}<span class="chip" id="modeChip"></span></div></div>
@@ -354,6 +387,7 @@ function bindView(r,arg){
  $$("[data-start-week]").forEach(b=>b.onclick=()=>{const w=b.dataset.startWeek;startSession({title:WEEK_LABEL[w]+" — كاملًا",units:unitsFromBlocks(BANK.filter(x=>wk(x.w)===wk(w))),mode:b.dataset.mode,nav:"weeks",back:"#week-"+w.toLowerCase()});});
  $$("[data-start-period]").forEach(b=>b.onclick=()=>{const [w,p]=b.dataset.startPeriod.split("|");const bs=BANK.filter(x=>wk(x.w)===w&&x.p===+p);startSession({title:WEEK_LABEL[w]+" — "+PERIOD_NAME[p],units:unitsFromBlocks(bs),mode:"practice",nav:"weeks",back:"#week-"+w.toLowerCase()});});
  $$("[data-start-skill]").forEach(b=>b.onclick=()=>{const s=SKILLS[+b.dataset.startSkill];const bs=LESSONS.filter(L=>L.sec===s.k).flatMap(L=>L.blocks);startSession({title:"مهارة: "+s.k,units:unitsFromBlocks(bs),nav:"skills",back:"#skill-"+b.dataset.startSkill});});
+ $$("[data-start-words]").forEach(b=>b.onclick=()=>{const k=b.dataset.startWords;const Ls=k==="all"?WORD_BANK:[WORD_BANK[+k]];startSession({title:"بنك الكلمات"+(k==="all"?"":" — "+Ls[0].title),units:unitsFromBlocks(Ls.flatMap(L=>L.blocks)),nav:"words",back:"#words"});});
  $$("[data-start-lesson]").forEach(b=>b.onclick=()=>{const L=LESSONS[+b.dataset.startLesson];startSession({title:L.lesson,units:unitsFromBlocks(L.blocks),mode:b.dataset.mode,nav:"skills",back:"#lesson-"+L.idx});});
  if(r==="run")bindRun();
  if(r==="exams")bindExams();
