@@ -8,7 +8,12 @@ globalThis.window = globalThis;
 for (const f of ['revision.js', 'wordbank.js']) vm.runInThisContext(fs.readFileSync(new URL('../data/' + f, import.meta.url), 'utf8'));
 const src = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const code = src.slice(src.indexOf('WEEK_LABEL.WB='), src.indexOf('function vWords'));
-const WB = new Function('LESSONS', 'BLOCK', 'IT', 'WEEK_LABEL', code + ';return WORD_BANK;')([], {}, {}, {});
+const LKEY = {};
+const WB = new Function('LESSONS', 'BLOCK', 'IT', 'WEEK_LABEL', 'LKEY', code + ';return WORD_BANK;')([], {}, {}, {}, LKEY);
+
+test('word bank lessons can be picked in the exam builder', () => {
+  for (const L of WB) assert.equal(LKEY['wb-' + L.id].blocks, L.blocks);
+});
 const items = WB.flatMap(L => L.items.map(x => x.it));
 
 test('every question has 4 different options and a valid answer', () => {
